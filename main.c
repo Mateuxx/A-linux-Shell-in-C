@@ -1,5 +1,9 @@
-#include<stdio.h>
-#include<string.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #define MAX_TOKENS 20 
 #define MAX_TOKEN_LENGHT  //tamanho max para cada token
@@ -18,6 +22,30 @@ int parseEntrada (char *input, char **tokens){
     } 
      return numTokens;
 }
+
+
+void executaComando(char **tokens) {
+
+    pid_t pid = fork(); //criação do processo
+
+    if (pid==0) {
+        //Pricesso child
+        execvp(tokens[0],tokens);
+        perror("Erro no comando");
+        exit(EXIT_FAILURE);
+    }
+    else if(pid > 0) {
+        //processo pai
+        wait(NULL); //espera até acabar o processo filho
+    }
+    else {
+        perror ("Erro ao criar processo filho");
+    }
+}
+
+
+
+
 
 int main () {
     
@@ -41,7 +69,8 @@ int main () {
           //printf("Token %d: %s\n", i, tokens[i]);
             //}
     }
-     
 
+
+     
     return 0;
 }
