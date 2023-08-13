@@ -6,49 +6,39 @@
 #include <sys/wait.h>
 
 #define MAX_TOKENS 20 
-#define MAX_TOKEN_LENGHT  //tamanho max para cada token
+#define MAX_TOKEN_LENGTH 100
 
+int parseEntrada(char *input, char **tokens) {
+    int numTokens = 0;
+    char *token = strtok(input, " \t\n");
 
-
-int parseEntrada (char *input, char **tokens){
-    
-    int numTokens = 0; //contador para saber quantos tokens foram encontrados
-    char *token = strtok(input, " \t\n"); // " \t\n" -> espaço em branco, new line
-    
-    while (token!= NULL && numTokens < MAX_TOKENS){
+    while (token != NULL && numTokens < MAX_TOKENS) {
         tokens[numTokens] = token;
         numTokens++;
         token = strtok(NULL, " \t\n");
-    } 
-     return numTokens;
-}
+    }
 
+    tokens[numTokens] = NULL; // Marca o final da lista de tokens
+    return numTokens;
+}
 
 void executaComando(char **tokens) {
+    pid_t pid = fork();
 
-    pid_t pid = fork(); //criação do processo
-
-    if (pid==0) {
-        //Pricesso child
-        execvp(tokens[0],tokens);
-        perror("Erro no comando");
+    if (pid == 0) {
+        // Processo filho
+        execvp(tokens[0], tokens);
+        perror("Erro ao executar o comando");
         exit(EXIT_FAILURE);
-    }
-    else if(pid > 0) {
-        //processo pai
-        wait(NULL); //espera até acabar o processo filho
-    }
-    else {
-        perror ("Erro ao criar processo filho");
+    } else if (pid > 0) {
+        // Processo pai
+        wait(NULL);
+    } else {
+        perror("Erro ao criar o processo filho");
     }
 }
 
-
-
-
-
-int main () {
-    
+int main() {
     char command[100];
     char *tokens[MAX_TOKENS];
     int numTokens;
@@ -62,15 +52,11 @@ int main () {
         }
 
         numTokens = parseEntrada(command, tokens);
-        printf("Numero de tokens: %d\n",numTokens);
 
-        //printf("Todos os Tokens:\n");
-         //for (int i = 0; i < numTokens; i++) {
-          //printf("Token %d: %s\n", i, tokens[i]);
-            //}
+        if (numTokens > 0) {
+            executaComando(tokens);
+        }
     }
 
-
-     
     return 0;
 }
