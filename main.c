@@ -54,6 +54,7 @@ void executaComando(char **tokens) {
         // Processo filho
         execvp(tokens[0], tokens);
         // Erro ao executar o comando, sair com código de erro
+        perror("Comando não encontrado");
         exit(EXIT_FAILURE);
     } else if (pid > 0) {
         // Processo pai
@@ -89,15 +90,16 @@ int main() {
         numTokens = parseEntrada(command, tokens);
 
         if (numTokens > 0) {
-            executaComando(tokens);
-        }
-        if (strcmp(tokens[0], "cd") == 0) {
+        if (strcmp(tokens[0], "cd") == 0) { //cd -> comando interno do proprio shell
             if (numTokens > 1) {
                 comandoCd(tokens[1]);
             } else {
                 printf("\nVoce quis dizer:\n\ncd <diretório>\n\n");
             }
-}
+        } else { //execução dos progamas executaveis -> programas separadas - comandos do shell do linux
+            executaComando(tokens);
+        }
+    }
 
 
     }
