@@ -96,7 +96,23 @@ int main() {
             } else {
                 printf("\nVoce quis dizer:\n\ncd <diretório>\n\n");
             }
-        } else { //execução dos progamas executaveis -> programas separadas - comandos do shell do linux
+        
+        } else if (strcmp(tokens[0], "ls") == 0) {
+            pid_t pid = fork();
+            if (pid == 0) {
+                execvp(tokens[0], tokens); //execvp() - recebe o nome de um arquivo (na mesma pasta) e os argumentos.
+                perror("ls");
+                exit(1);
+            } else {
+                waitpid(pid, NULL, 0);
+            }
+        } else if (strcmp(tokens[0], "pwd") == 0) {
+            char cwd[1024];
+            getcwd(cwd, sizeof(cwd));
+            printf("%s\n", cwd);
+        } else if (strcmp(tokens[0], "exit") == 0) { 
+            break;
+        }else { //execução dos progamas executaveis -> programas separadas - comandos do shell do linux
             executaComando(tokens);
         }
     }
