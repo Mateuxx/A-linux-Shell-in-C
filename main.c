@@ -65,7 +65,7 @@ void executaComando(char **tokens) {
     }
 }
 
-void executaComandoComPipe(char **tokens1, char **tokens2) {
+void executaComPipe(char **tokens1, char **tokens2) {
     int pipefd[2];
     if (pipe(pipefd) == -1) {
         perror("pipe");
@@ -74,38 +74,35 @@ void executaComandoComPipe(char **tokens1, char **tokens2) {
 
     pid_t pid1 = fork();
     if (pid1 == 0) {
-        // Processo filho 1
-        close(pipefd[0]);  // Fecha a extremidade de leitura do pipe
-        dup2(pipefd[1], STDOUT_FILENO);  // Redireciona a saída padrão para a extremidade de escrita do pipe
-        close(pipefd[1]);  // Fecha a extremidade de escrita do pipe
+        close(pipefd[0]);
+        dup2(pipefd[1], STDOUT_FILENO);
+        close(pipefd[1]);
+
         execvp(tokens1[0], tokens1);
-        perror("Comando 1 não encontrado");
+        perror("Comando não encontrado");
         exit(EXIT_FAILURE);
     } else if (pid1 > 0) {
-        // Processo pai
         pid_t pid2 = fork();
         if (pid2 == 0) {
-            // Processo filho 2
-            close(pipefd[1]);  // Fecha a extremidade de escrita do pipe
-            dup2(pipefd[0], STDIN_FILENO);  // Redireciona a entrada padrão para a extremidade de leitura do pipe
-            close(pipefd[0]);  // Fecha a extremidade de leitura do pipe
+            close(pipefd[1]);
+            dup2(pipefd[0], STDIN_FILENO);
+            close(pipefd[0]);
+
             execvp(tokens2[0], tokens2);
-            perror("Comando 2 não encontrado");
+            perror("Comando não encontrado");
             exit(EXIT_FAILURE);
         } else if (pid2 > 0) {
-            // Processo pai
             close(pipefd[0]);
             close(pipefd[1]);
-            waitpid(pid1, NULL, 0);
-            waitpid(pid2, NULL, 0);
+            wait(NULL);
+            wait(NULL);
         } else {
-            perror("Erro ao criar o processo filho 2");
+            perror("Erro ao criar o processo filho");
         }
     } else {
-        perror("Erro ao criar o processo filho 1");
+        perror("Erro ao criar o processo filho");
     }
 }
-
 
 void executaComandoEmSegundoPlano(char **tokens){
     int pid = fork();
@@ -197,34 +194,30 @@ int main() {
                 } else {
                     printf("\nVoce quis dizer:\n\ncd <diretório>\n\n");
                 }
-        
-            } else if(numTokens > 2 && strcmp(tokens[1], "|") == 0){
-                char **tokens1 = tokens;
-                char **tokens2 = tokens + 2;
-                executaComandoComPipe(tokens1, tokens2);
             } else if (numTokens > 1 && ((strcmp(tokens[1], ">") == 0) || (strcmp(tokens[1], "<") == 0))) {
                 teste(tokens);
-            }else if (strcmp(tokens[0], "ls") == 0) {
-                pid_t pid = fork();
-                if (pid == 0) {
-                    execvp(tokens[0], tokens); //execvp() - recebe o nome de um arquivo (na mesma pasta) e os argumentos.
-                    perror("ls");
-                    exit(1);
-                } else {
-                    waitpid(pid, NULL, 0);
-                }
-            } else if (strcmp(tokens[0], "pwd") == 0) {
-                char cwd[1024];
-                getcwd(cwd, sizeof(cwd));
-                printf("%s\n", cwd);
             } else if (strcmp(tokens[0], "exit") == 0) { 
                 break;
             } else if(numTokens > 1 && strcmp(tokens[numTokens - 1], "&") == 0){
                 tokens[numTokens-1] = NULL;
                 executaComandoEmSegundoPlano(tokens);
-            }
-            else { //execução dos progamas executaveis -> programas separadas - comandos do shell do linux
-                executaComando(tokens);
+            }else {
+                int pipeIndex = -1;
+                for (int i = 0; i < numTokens; i++) {
+                    if (strcmp(tokens[i], "|") == 0) {
+                        tokens[i] = NULL;
+                        pipeIndex = i;
+                        break;
+                    }
+                }
+
+                if (pipeIndex >= 0) {
+                    char **tokens1 = tokens;
+                    char **tokens2 = tokens + pipeIndex + 1;
+                    executaComPipe(tokens1, tokens2);
+                } else {
+                    executaComando(tokens);
+                }
             }
         }
 
