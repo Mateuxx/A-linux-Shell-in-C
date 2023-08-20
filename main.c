@@ -65,26 +65,92 @@ void executaComando(char **tokens) {
     }
 }
 
-void teste(char **tokens) {
+void executaComandoComPipe(char **tokens1, char **tokens2) {
+    int pipefd[2];
+    if (pipe(pipefd) == -1) {
+        perror("pipe");
+        exit(EXIT_FAILURE);
+    }
+
+    pid_t pid1 = fork();
+    if (pid1 == 0) {
+        // Processo filho 1
+        close(pipefd[0]);  // Fecha a extremidade de leitura do pipe
+        dup2(pipefd[1], STDOUT_FILENO);  // Redireciona a saída padrão para a extremidade de escrita do pipe
+        close(pipefd[1]);  // Fecha a extremidade de escrita do pipe
+        execvp(tokens1[0], tokens1);
+        perror("Comando 1 não encontrado");
+        exit(EXIT_FAILURE);
+    } else if (pid1 > 0) {
+        // Processo pai
+        pid_t pid2 = fork();
+        if (pid2 == 0) {
+            // Processo filho 2
+            close(pipefd[1]);  // Fecha a extremidade de escrita do pipe
+            dup2(pipefd[0], STDIN_FILENO);  // Redireciona a entrada padrão para a extremidade de leitura do pipe
+            close(pipefd[0]);  // Fecha a extremidade de leitura do pipe
+            execvp(tokens2[0], tokens2);
+            perror("Comando 2 não encontrado");
+            exit(EXIT_FAILURE);
+        } else if (pid2 > 0) {
+            // Processo pai
+            close(pipefd[0]);
+            close(pipefd[1]);
+            waitpid(pid1, NULL, 0);
+            waitpid(pid2, NULL, 0);
+        } else {
+            perror("Erro ao criar o processo filho 2");
+        }
+    } else {
+        perror("Erro ao criar o processo filho 1");
+    }
+}
+
+
+void executaComandoEmSegundoPlano(char **tokens){
     int pid = fork();
+
+    if(pid == 0){
+        execvp(tokens[0], tokens);
+        perror("Comando não encontrado");
+        exit(EXIT_FAILURE);
+    }else if(pid > 0){
+        //t
+    }else{
+        perror("Erro ao criar o processo filho");
+    }
+}
+
+void teste(char **tokens) {
+    pid_t pid = fork();
 
     if (pid == 0) {
         // Processo filho
-        int fd = open(tokens[2], O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU);
-        if (fd == -1) {
-            perror("open");
-            exit(EXIT_FAILURE);
+        int in_fd = -1;
+        int out_fd = -1;
+
+        for (int i = 0; tokens[i] != NULL; i++) {
+            if (strcmp(tokens[i], "<") == 0) {
+                in_fd = open(tokens[i + 1], O_RDONLY);
+                if (in_fd == -1) {
+                    perror("open");
+                    exit(EXIT_FAILURE);
+                }
+                dup2(in_fd, STDIN_FILENO);
+                close(in_fd);
+                tokens[i] = NULL;
+            } else if (strcmp(tokens[i], ">") == 0) {
+                out_fd = open(tokens[i + 1], O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU);
+                if (out_fd == -1) {
+                    perror("open");
+                    exit(EXIT_FAILURE);
+                }
+                dup2(out_fd, STDOUT_FILENO);
+                close(out_fd);
+                tokens[i] = NULL;
+            }
         }
 
-        // Redirecionar a saída padrão para o arquivo
-        dup2(fd, STDOUT_FILENO);
-        close(fd);
-
-        // Remover o operador '>' e o nome do arquivo da lista de tokens
-        tokens[1] = NULL;
-        tokens[2] = NULL;
-
-        // Executar o comando especificado
         execvp(tokens[0], tokens);
 
         // Se execvp falhar, exibir mensagem de erro e sair
@@ -125,35 +191,42 @@ int main() {
         numTokens = parseEntrada(command, tokens);
 
         if (numTokens > 0) {
-        if (strcmp(tokens[0], "cd") == 0) { //cd -> comando interno do proprio shell
-            if (numTokens > 1) {
-                comandoCd(tokens[1]);
-            } else {
-                printf("\nVoce quis dizer:\n\ncd <diretório>\n\n");
-            }
+            if (strcmp(tokens[0], "cd") == 0) { //cd -> comando interno do proprio shell
+                if (numTokens > 1) {
+                 comandoCd(tokens[1]);
+                } else {
+                    printf("\nVoce quis dizer:\n\ncd <diretório>\n\n");
+                }
         
-        }  else if (numTokens > 1 && strcmp(tokens[1], ">") == 0) {
-            teste(tokens);
-        }else if (strcmp(tokens[0], "ls") == 0) {
-            pid_t pid = fork();
-            if (pid == 0) {
-                execvp(tokens[0], tokens); //execvp() - recebe o nome de um arquivo (na mesma pasta) e os argumentos.
-                perror("ls");
-                exit(1);
-            } else {
-                waitpid(pid, NULL, 0);
+            } else if(numTokens > 2 && strcmp(tokens[1], "|") == 0){
+                char **tokens1 = tokens;
+                char **tokens2 = tokens + 2;
+                executaComandoComPipe(tokens1, tokens2);
+            } else if (numTokens > 1 && ((strcmp(tokens[1], ">") == 0) || (strcmp(tokens[1], "<") == 0))) {
+                teste(tokens);
+            }else if (strcmp(tokens[0], "ls") == 0) {
+                pid_t pid = fork();
+                if (pid == 0) {
+                    execvp(tokens[0], tokens); //execvp() - recebe o nome de um arquivo (na mesma pasta) e os argumentos.
+                    perror("ls");
+                    exit(1);
+                } else {
+                    waitpid(pid, NULL, 0);
+                }
+            } else if (strcmp(tokens[0], "pwd") == 0) {
+                char cwd[1024];
+                getcwd(cwd, sizeof(cwd));
+                printf("%s\n", cwd);
+            } else if (strcmp(tokens[0], "exit") == 0) { 
+                break;
+            } else if(numTokens > 1 && strcmp(tokens[numTokens - 1], "&") == 0){
+                tokens[numTokens-1] = NULL;
+                executaComandoEmSegundoPlano(tokens);
             }
-        } else if (strcmp(tokens[0], "pwd") == 0) {
-            char cwd[1024];
-            getcwd(cwd, sizeof(cwd));
-            printf("%s\n", cwd);
-        } else if (strcmp(tokens[0], "exit") == 0) { 
-            break;
-        }else { //execução dos progamas executaveis -> programas separadas - comandos do shell do linux
-            executaComando(tokens);
+            else { //execução dos progamas executaveis -> programas separadas - comandos do shell do linux
+                executaComando(tokens);
+            }
         }
-    }
-
 
     }
     return 0;
