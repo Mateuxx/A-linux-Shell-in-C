@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <fcntl.h>
 
 #define MAX_TOKENS 20 
 #define MAX_TOKEN_LENGTH 100
@@ -64,6 +65,40 @@ void executaComando(char **tokens) {
     }
 }
 
+void teste(char **tokens) {
+    int pid = fork();
+
+    if (pid == 0) {
+        // Processo filho
+        int fd = open(tokens[2], O_CREAT | O_WRONLY | O_TRUNC, S_IRWXU);
+        if (fd == -1) {
+            perror("open");
+            exit(EXIT_FAILURE);
+        }
+
+        // Redirecionar a saída padrão para o arquivo
+        dup2(fd, STDOUT_FILENO);
+        close(fd);
+
+        // Remover o operador '>' e o nome do arquivo da lista de tokens
+        tokens[1] = NULL;
+        tokens[2] = NULL;
+
+        // Executar o comando especificado
+        execvp(tokens[0], tokens);
+
+        // Se execvp falhar, exibir mensagem de erro e sair
+        perror("Comando não encontrado");
+        exit(EXIT_FAILURE);
+    } else if (pid > 0) {
+        // Processo pai
+        wait(NULL);
+    } else {
+        perror("Erro ao criar o processo filho");
+    }
+}
+
+
 
 int main() {
     
@@ -97,7 +132,9 @@ int main() {
                 printf("\nVoce quis dizer:\n\ncd <diretório>\n\n");
             }
         
-        } else if (strcmp(tokens[0], "ls") == 0) {
+        }  else if (numTokens > 1 && strcmp(tokens[1], ">") == 0) {
+            teste(tokens);
+        }else if (strcmp(tokens[0], "ls") == 0) {
             pid_t pid = fork();
             if (pid == 0) {
                 execvp(tokens[0], tokens); //execvp() - recebe o nome de um arquivo (na mesma pasta) e os argumentos.
