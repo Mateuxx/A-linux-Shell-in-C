@@ -1,3 +1,7 @@
+//Maria Luiza Saldanha - 22153140
+//Mateus Mota Nobrega - 21953021
+//Gabriel César Tavares Ferreira - 21854868
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -47,22 +51,26 @@ void comandoCd(char *dir) {
     }
 }
 
-
-void executaComando(char **tokens) {
-    pid_t pid = fork();
-    
-    if (pid == 0) {
-        // Processo filho
-        execvp(tokens[0], tokens);
-        // Erro ao executar o comando, sair com código de erro
-        perror("Comando não encontrado");
-        exit(EXIT_FAILURE);
-    } else if (pid > 0) {
-        // Processo pai
-        wait(NULL);
-    } else {
-        perror("Erro ao criar o processo filho");
-    }
+void executaComando(char **tokens) { 
+    pid_t pid = fork(); 
+     
+    if (pid == 0) { 
+        // Verifica se o primeiro token é um caminho de arquivo válido 
+        if (access(tokens[0], X_OK) == 0) { 
+            execv(tokens[0], tokens); 
+        } else { 
+            // Se não for um caminho válido, tenta executar o comando com o PATH 
+            execvp(tokens[0], tokens); 
+            // Erro ao executar o comando, sair com código de erro 
+            perror("Comando não encontrado"); 
+            exit(EXIT_FAILURE); 
+        } 
+    } else if (pid > 0) { 
+        // Processo pai 
+        wait(NULL); 
+    } else { 
+        perror("Erro ao criar o processo filho"); 
+    } 
 }
 
 void executaComPipe(char **tokens1, char **tokens2) {
@@ -118,7 +126,7 @@ void executaComandoEmSegundoPlano(char **tokens){
     }
 }
 
-void teste(char **tokens) {
+void redireciona(char **tokens) {
     pid_t pid = fork();
 
     if (pid == 0) {
@@ -195,7 +203,7 @@ int main() {
                     printf("\nVoce quis dizer:\n\ncd <diretório>\n\n");
                 }
             } else if (numTokens > 1 && ((strcmp(tokens[1], ">") == 0) || (strcmp(tokens[1], "<") == 0))) {
-                teste(tokens);
+                redireciona(tokens);
             } else if (strcmp(tokens[0], "exit") == 0) { 
                 break;
             } else if(numTokens > 1 && strcmp(tokens[numTokens - 1], "&") == 0){
